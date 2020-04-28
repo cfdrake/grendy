@@ -4,13 +4,13 @@ a simple drone synth, grendel drone commander inspired
 
 ## Installation
 
-[Download latest release](https://github.com/cfdrake/grendy/archive/master.zip) and copy into `~/dust/code`.
+[Download latest release](https://github.com/cfdrake/grendy/archive/master.zip) and copy files into `~/dust/code/grendy`.
 
 Or use Git:
 ```
 <ssh into your Norns>
 $ cd ~/dust/code
-$ git clone git@github.com:cfdrake/grendy.git
+$ git clone https://github.com/cfdrake/grendy.git
 ```
 
 Note that after installing you must `SYSTEM => RESET` your Norns before running this script, as it includes a new SuperCollider engine.
