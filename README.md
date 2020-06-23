@@ -22,6 +22,7 @@ The following controls are available for `grendy`:
 - Key 2 randomizes OSC/MIXER section
 - Key 3 randomizes FILTER/LFO section
 - Enc 1, Enc 2, and Enc 3 controls filter frequency and oscillator frequencies
+- Enc 4 controls amplitude (for Fates models)
 - Holding Key 1 + Enc 1, Enc 2, and Enc 3 controls filter resonance and LFO frequency/depth
 
 Tweak more parameters from the `[PARAMETERS] => [EDIT]` page.

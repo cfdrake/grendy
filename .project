@@ -1,0 +1,21 @@
+{
+  "file_info": {
+    "version": 1,
+    "kind": "project_metadata"
+  },
+  "installed_on": "2020-06-21T19:44:07.777826167-05:00",
+  "updated_on": "0001-01-01T00:00:00Z",
+  "project_url": "https://github.com/cfdrake/grendy",
+  "catalog_entry": {
+    "project_name": "grendy",
+    "project_url": "https://github.com/cfdrake/grendy",
+    "author": "Colin Drake (cfd90)",
+    "description": "simple drone synth, grendel drone commander inspired",
+    "discussion_url": "https://llllllll.co/t/31721",
+    "tags": [
+      "synth",
+      "midi"
+    ],
+    "origin": "lines"
+  }
+}
