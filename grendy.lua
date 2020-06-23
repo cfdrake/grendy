@@ -1,7 +1,7 @@
 -- ~~ grendy ~~
 -- a simple drone synth
 -- grendel drone commander inspired
--- v1.0.0 @cfd90
+-- v1.1.0 @cfd90
 --
 -- KEY2: randomize OSC/MIXER
 -- KEY3: randomize FILTER/LFO
@@ -9,6 +9,7 @@
 -- ENC1: FILTER freq
 -- ENC2: OSC1 freq
 -- ENC3: OSC2 freq
+-- ENC4: AMP
 --
 -- KEY1+ENC1: FILTER res
 -- KEY1+ENC2: LFO freq
@@ -21,6 +22,11 @@
 music = require 'musicutil'
 
 engine.name = "Grendy"
+
+local viewport = {
+  width = 128,
+  height = 64
+}
 
 ------
 ------ STATE
@@ -42,23 +48,23 @@ end
 function setup_params()
   -- OSC1
   params:add_separator()
-  params:add_control("freq1", "osc1 freq", controlspec.new(20, 360, 'exp', 0.5, 220, 'hz'))
+  params:add_control("freq1", "osc1 freq", controlspec.new(20, 720, 'exp', 0.5, 220, 'hz'))
   params:set_action("freq1", function(x) engine.freq1(x) end)
   
-  params:add_control("shape1", "osc1 shape [tri=>sqr]", controlspec.new(-1, 1, 'lin', 0.01, 1, ''))
+  params:add_control("shape1", "osc1 shape [tri → sqr]", controlspec.new(-1, 1, 'lin', 0.01, 1, ''))
   params:set_action("shape1", function(x) engine.shape1(x) end)
   
   -- OSC2
   params:add_separator()
-  params:add_control("freq2", "osc2 freq", controlspec.new(20, 360, 'exp', 0.5, 220, 'hz'))
+  params:add_control("freq2", "osc2 freq", controlspec.new(20, 720, 'exp', 0.5, 220, 'hz'))
   params:set_action("freq2", function(x) engine.freq2(x) end)
   
-  params:add_control("shape2", "osc2 shape [tri=>sqr]", controlspec.new(-1, 1, 'lin', 0.01, 1, ''))
+  params:add_control("shape2", "osc2 shape [tri → sqr]", controlspec.new(-1, 1, 'lin', 0.01, 1, ''))
   params:set_action("shape2", function(x) engine.shape2(x) end)
   
   -- MIXER
   params:add_separator()
-  params:add_control("mix", "osc mix [osc1=>osc2]", controlspec.new(-1, 1, 'lin', 0.1, 0, ''))
+  params:add_control("mix", "osc mix [osc1 → osc2]", controlspec.new(-1, 1, 'lin', 0.1, 0, ''))
   params:set_action("mix", function(x) engine.mix(x) end)
   
   -- FILTER
@@ -80,7 +86,7 @@ function setup_params()
   params:add_control("cwidth", "lfo click width", controlspec.new(0.1, 0.9, 'lin', 0.1, 0.2, ''))
   params:set_action("cwidth", function(x) engine.cwidth(x) end)
   
-  params:add_control("lshape", "lfo shape [ramp=>click]", controlspec.new(-1, 1, 'lin', 0.1, -1, ''))
+  params:add_control("lshape", "lfo shape [ramp → click]", controlspec.new(-1, 1, 'lin', 0.1, -1, ''))
   params:set_action("lshape", function(x) engine.lshape(x) end)
   
   params:add_control("ldepth", "lfo depth", controlspec.new(0, 1000, 'lin', 0.1, 0, ''))
@@ -94,22 +100,27 @@ end
 
 function setup_midi()
   m = midi.connect()
-  
+
   m.event = function(data)
     local d = midi.to_msg(data)
     
     if d.type == "note_on" then
       -- Round-robin set OSC1 and OSC2
       hz = music.note_num_to_freq(d.note)
-      
+
       if midiFirstOsc then
         params:set("freq1", hz)
       else
-        params:set("freq2", hz)
+        params:set("freq2",  hz)
       end
       
+      -- set AMP with note velocity
+      params:set("amp", d.vel / 127)
+
       midiFirstOsc = not midiFirstOsc
     end
+
+    redraw()
   end
 end
 
@@ -135,6 +146,8 @@ function key(n, z)
   elseif n == 3 and z == 1 then
     randomize_filter()
   end
+
+  redraw()
 end
 
 function enc(n, d)
@@ -159,6 +172,14 @@ function enc(n, d)
       params:delta("freq2", d)
     end
   end
+
+  if (#norns.encoders.accel == 4) then
+    if n == 4 then
+      params:delta("amp", d)
+    end
+  end
+  
+  redraw()
 end
 
 ------
@@ -167,64 +188,101 @@ end
 
 function redraw()
   screen.clear()
-  
+
   -- Encoder documentation
   if shift then
     screen.move(0, 10)
-    screen.level(1)
-    screen.text("[ENC1] ")
-    screen.level(5)
+    screen.level(2)
+    screen.text("[E1] ")
+    screen.level(10)
+    screen.move(viewport.width * .2, 10)
     screen.text("filter res")
-    screen.move(0, 20)
-    screen.level(1)
-    screen.text("[ENC2] ")
-    screen.level(5)
+    screen.move(viewport.width * .7, 10)
+    screen.text(params:get("fres"))
+
+    screen.move(0, 18)
+    screen.level(2)
+    screen.text("[E2] ")
+    screen.level(10)
+    screen.move(viewport.width * .2, 18)
     screen.text("lfo freq")
-    screen.move(0, 30)
-    screen.level(1)
-    screen.text("[ENC3] ")
-    screen.level(5)
+    screen.move(viewport.width * .7, 18)
+    screen.text(params:get("lfreq") .. " hz")
+
+    screen.move(0, 26)
+    screen.level(2)
+    screen.text("[E3] ")
+    screen.level(10)
+    screen.move(viewport.width * .2, 26)
     screen.text("lfo depth")
+    screen.move(viewport.width * .7, 26)
+    screen.text(params:get("ldepth"))
   else
     screen.move(0, 10)
-    screen.level(1)
-    screen.text("[ENC1] ")
-    screen.level(5)
+    screen.level(2)
+    screen.text("[E1] ")
+    screen.level(10)
+    screen.move(viewport.width * .2, 10)
     screen.text("filter freq")
-    screen.move(0, 20)
-    screen.level(1)
-    screen.text("[ENC2] ")
-    screen.level(5)
+    screen.move(viewport.width * .7, 10)
+    screen.text(params:get("ffreq") .. " hz")
+
+    screen.move(0, 18)
+    screen.level(2)
+    screen.text("[E2] ")
+    screen.level(10)
+    screen.move(viewport.width * .2, 18)
     screen.text("osc1 freq")
-    screen.move(0, 30)
-    screen.level(1)
-    screen.text("[ENC3] ")
-    screen.level(5)
+    screen.move(viewport.width * .7, 18)
+    screen.text(params:get("freq1") .. " hz")
+
+    screen.move(0, 26)
+    screen.level(2)
+    screen.text("[E3] ")
+    screen.level(10)
+    screen.move(viewport.width * .2, 26)
     screen.text("osc2 freq")
+    screen.move(viewport.width * .7, 26)
+    screen.text(params:get("freq2") .. " hz")
   end
   
+  screen.move(0, 34)
+  screen.level(2)
+  if (#norns.encoders.accel == 4) then
+    screen.text("[E4] ")
+  end
+  screen.level(10)
+  screen.move(viewport.width * .2, 34)
+  screen.text("amp")
+  screen.move(viewport.width * .7, 34)
+  screen.text(params:get("amp"))
+
   -- Key documentation
   if not shift then
-    screen.move(0, 40)
-    screen.level(1)
-    screen.text("[KEY1] ")
-    screen.level(5)
-    screen.text("held, toggle page 2")
+    screen.move(0, 44)
+    screen.level(2)
+    screen.text("[K1] ")
+    screen.level(10)
+    screen.move(viewport.width * .2, 44)
+    screen.text("hold, toggle page 2")
   else
-    screen.move(0, 40)
-    screen.level(1)
-    screen.text("see params page for more")
+    screen.move(viewport.width * .5, 44)
+    screen.level(2)
+    screen.text_center("see params page for more")
   end
   
-  screen.move(0, 50)
-  screen.level(1)
-  screen.text("[KEY2] ")
-  screen.level(5)
+  screen.move(0, 52)
+  screen.level(2)
+  screen.text("[K2] ")
+  screen.level(10)
+  screen.move(viewport.width * .2, 52)
   screen.text("randomize OSC/MIXER")
+  
   screen.move(0, 60)
-  screen.level(1)
-  screen.text("[KEY3] ")
-  screen.level(5)
+  screen.level(2)
+  screen.text("[K3] ")
+  screen.level(10)
+  screen.move(viewport.width * .2, 60)
   screen.text("randomize FILTER/LFO")
   
   screen.update()
@@ -235,9 +293,9 @@ end
 ------
 
 function randomize_osc()
-  params:set("freq1", 20 + (math.random() * (360 - 20)))
+  params:set("freq1", 20 + (math.random() * (720 - 20)))
   params:set("shape1", (math.random() * 2) - 1)
-  params:set("freq2", 20 + (math.random() * (360 - 20)))
+  params:set("freq2", 20 + (math.random() * (720 - 20)))
   params:set("shape2", (math.random() * 2) - 1)
   params:set("mix", (math.random() * 2) - 1)
 end
@@ -250,3 +308,4 @@ function randomize_filter()
   params:set("lshape", (math.random() * 2) - 1)
   params:set("ldepth", math.random() * 1000)
 end
+
