@@ -1,111 +1,66 @@
-// CroneEngine_Grendy
-// SuperCollider engine for grendy
-
 Engine_Grendy : CroneEngine {
-	var <synth;
+    var <synth;
 
-	*new { arg context, doneCallback;
-		^super.new(context, doneCallback);
-	}
+    *new { arg context, doneCallback;
+        ^super.new(context, doneCallback);
+    }
 
-	alloc {
-	  // Setup synth variable
-		synth = {
-			arg out,
-			  freq1 = 220, shape1 = 1,
-			  freq2 = 220, shape2 = 1,
-			  mix = 0,
-			  ffreq = 440, fres = 1,
-			  lfreq = 1, ldepth = 100, lshape = -1, cspeed = 1, cwidth = 0.2,
-			  amp = 1;
-			
-			// OSC1: Tri/Pulse crossfaded
-			var osc1 = XFade2.ar(LFTri.ar(freq1), Pulse.ar(freq1), shape1);
-			
-			// OSC2: Tri/Pulse crossfaded
-			var osc2 = XFade2.ar(LFTri.ar(freq2), Pulse.ar(freq2), shape2);
-			
-			// MIXER: OSC1/OSC2 crossfaded
-			var osc = XFade2.ar(osc1, osc2, mix);
-			
-			// LFO: Ramp/Click crossfaded
-			// Changes from GDC:
-			// - Pulse is not at same position of LFO cycle, undecided if this is worth investigating, it sounds nice as-is
-			// - Does not have "inverted" LFO shape
-			// - Adds ability to control pulse width of click signal
-			// - Adds ability to additional click divisions other than 2/4/8/16 for more interesting rhythms
-			var sr = SampleRate.ir;
-			
-	    var ramp = Phasor.ar(0, lfreq / sr, 0, 1);
-	    var click = Pulse.ar(lfreq * cspeed, cwidth);
-	    
-	    var lfo = XFade2.ar(ramp, click, lshape);
-	
-			// FILTER: input from OSC
-			var filter = MoogFF.ar(osc, ffreq + (lfo * ldepth), fres);
-			
-			// AMP: input from FILTER
-			var final = filter * amp;
-			
-			// OUTPUT stage
-			Out.ar(out, (final).dup);
-		}.play(args: [\out, context.out_b], target: context.xg);
+    alloc {
+        synth = {
+            arg out,
+                pitch1 = 80, pitch2 = 120, shape1 = 0, shape2 = 0, slopLevel = 0, oscmix = 0,
+                filterFreq = 500, filterRes = 3,
+                lfoRate = 0.5, lfo2Rate = 8, lfo2Level = 1.0, lfoDepth = 500,
+                panRate = 0.3, autoPan = 0, amp = 1;
 
-    // Setup Norns commands
-		this.addCommand("freq1", "f", { arg msg;
-			synth.set(\freq1, msg[1]);
-		});
-		
-		this.addCommand("shape1", "f", { arg msg;
-			synth.set(\shape1, msg[1]);
-		});
-		
-		this.addCommand("freq2", "f", { arg msg;
-			synth.set(\freq2, msg[1]);
-		});
-		
-		this.addCommand("shape2", "f", { arg msg;
-			synth.set(\shape2, msg[1]);
-		});
-		
-		this.addCommand("mix", "f", { arg msg;
-			synth.set(\mix, msg[1]);
-		});
-		
-		this.addCommand("ffreq", "f", { arg msg;
-			synth.set(\ffreq, msg[1]);
-		});
-		
-		this.addCommand("fres", "f", { arg msg;
-			synth.set(\fres, msg[1]);
-		});
-		
-		this.addCommand("lfreq", "f", { arg msg;
-			synth.set(\lfreq, msg[1]);
-		});
-		
-		this.addCommand("ldepth", "f", { arg msg;
-			synth.set(\ldepth, msg[1]);
-		});
-		
-		this.addCommand("lshape", "f", { arg msg;
-			synth.set(\lshape, msg[1]);
-		});
-		
-		this.addCommand("cspeed", "f", { arg msg;
-			synth.set(\cspeed, msg[1]);
-		});
-		
-		this.addCommand("cwidth", "f", { arg msg;
-			synth.set(\cwidth, msg[1]);
-		});
-		
-		this.addCommand("amp", "f", { arg msg;
-			synth.set(\amp, msg[1]);
-		});
-	}
+            // oscillators
+            var slop1 = Lag.ar(LFNoise0.ar(2) * slopLevel, 0.5);
+            var slop2 = Lag.ar(LFNoise0.ar(2) * slopLevel, 0.5);
 
-	free {
-		synth.free;
-	}
+            var sq1 = Pulse.ar(pitch1 + slop1);
+            var tri1 = Saw.ar(pitch1 + slop2);
+            var osc1 = SelectX.ar(shape1, [sq1, tri1]);
+
+            var sq2 = Pulse.ar(pitch2 + slop1);
+            var tri2 = Saw.ar(pitch2 + slop2);
+            var osc2 = SelectX.ar(shape2, [sq2, tri2]);
+
+            // mixer
+            var mix = LinXFade2.ar(osc1, osc2, oscmix);
+
+            // lfo
+            var lfo1 = Saw.kr(lfoRate, mul: 0.5, add: 0.5);
+            var lfo2 = Pulse.kr(lfoRate * lfo2Rate);
+            var lfo = Mix.kr([lfo1, (lfo2 * lfo2Level)]);
+
+            // filter
+            var filter = MoogFF.ar(mix, filterFreq + (lfo * lfoDepth), filterRes);
+
+            // amplifier
+            var panner = autoPan * (SinOsc.kr(panRate, mul: 0.2) + SinOsc.kr(panRate + 0.1, mul: 0.1));
+            var final = Limiter.ar(filter * amp);
+            
+            Out.ar(out, Pan2.ar(final * amp, panner));
+        }.play(args: [\out, context.out_b], target: context.xg);
+
+        #[\pitch1, \pitch2, \oscmix, \slopLevel, \filterFreq, \filterRes, \lfoRate, \lfo2Level, \lfoDepth, \panRate, \autoPan, \amp].do({
+            arg name;
+            this.addCommand(name, "f", {
+                arg msg;
+                synth.set(name, msg[1]);
+            });
+        });
+        
+        #[\shape1, \shape2, \lfo2Rate].do({
+            arg name;
+            this.addCommand(name, "i", {
+                arg msg;
+                synth.set(name, msg[1]);
+            });
+        });
+    }
+
+    free {
+        synth.free;
+    }
 }
