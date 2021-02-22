@@ -87,7 +87,7 @@ function key(n, z)
   if z == 1 then
     if n == 2 then 
       ez.page = util.clamp(ez.page - 1, 1, #ez.pages)
-    else
+    elseif n == 3 then
       ez.page = util.clamp(ez.page + 1, 1, #ez.pages)
     end
   end
